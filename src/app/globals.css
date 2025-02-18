@@ -117,11 +117,3 @@ html:not(.dark) body {
     @apply bg-background text-foreground;
   }
 }
-
-.icon-xl-heavy {
-  color: hsl(118, 67%, 92%);
-  stroke-width: 2;
-  flex-shrink: 0;
-  height: 24px;
-  width: 24px;
-}

@@ -11,7 +11,9 @@ import Switch from "@/components/switch";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import SendBtn from "@/components/sendBtn";
 import { useEffect, useState } from "react";
+import TranslateBtn from "@/components/translateBtn";
 
 export default function chatPage() {
   const [input, setInput] = useState("");
@@ -59,7 +61,7 @@ export default function chatPage() {
   return (
     <SidebarProvider>
       <AppSidebar />
-      <SidebarInset>
+      <SidebarInset className="bg-transparent">
         <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4 bg-white dark:bg-gray-900">
           <SidebarTrigger className="-ml-1" />
           <Separator orientation="vertical" className="mr-2 h-4" />
@@ -72,11 +74,11 @@ export default function chatPage() {
             <Switch />
           </div>
         </header>
-        <div className="flex flex-1 flex-col gap-4 p-4">
+        <div className="flex flex-1 flex-col gap-4 p-[0.3rem]">
           <div className="min-h-[100vh] flex-1 rounded-xl bg-muted/50 md:min-h-min">
-            <div className="flex-1 flex flex-col h-full p-6">
+            <div className="flex-1 flex flex-col rounded-xl h-full p-6">
               {/* Chat Output Box */}
-              <Card className="flex-1 rounded shadow bg-white dark:bg-gray-800 overflow-y-auto mb-4">
+              <Card className="flex-1 rounded shadow bg-white dark:bg-gray-800 overflow-y-auto mb-4 -me-6 -ms-6 -mt-6 rounded-tl-xl rounded-tr-xl">
                 {chats.length > 0 ? (
                   chats.map((chat, index) => (
                     <p
@@ -87,7 +89,7 @@ export default function chatPage() {
                     </p>
                   ))
                 ) : (
-                  <p className="text-gray-500 dark:text-gray-400">
+                  <p className="text-gray-500 dark:text-gray-400 pt-4 pl-4">
                     Start a conversation...
                   </p>
                 )}
@@ -114,46 +116,36 @@ export default function chatPage() {
                 )}
               </Card>
 
-              <div className="flex flex-col"></div>
-              {/* Chat Input Box */}
-              <div className="flex flex-col md:flex-row mb-4">
-                <Input
-                  className="flex-1 p-3 rounded-md dark:bg-gray-700 dark:text-white focus:ring-[#51DA4C] mb-4 md:mb-0"
-                  placeholder="Type a message..."
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                />
-                <Button
-                  className="ml-2 bg-[#51DA4C] text-white"
-                  onClick={handleSend}
-                >
-                  <span role="img" aria-label="send">
-                    ✉️
-                  </span>{" "}
-                  {/* Send icon */}
-                </Button>
+              <div className="flex flex-col">
+                {/* Chat Input Box */}
+                <div className="flex flex-col md:flex-row mb-4">
+                  <Input
+                    className="flex-1 p-3 h-[3.75rem] rounded-md dark:bg-gray-700 dark:text-white focus:ring-[#51DA4C] mb-4 md:mb-0"
+                    placeholder="Type a message..."
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                  />
+                  <SendBtn onClick={handleSend} />
+                </div>
+
+                {/* Language Selector */}
+                <div className="flex mb-4">
+                  <select
+                    className="p-3 rounded-md dark:bg-gray-700 dark:text-white flex-1"
+                    value={selectedLanguage}
+                    onChange={(e) => setSelectedLanguage(e.target.value)}
+                  >
+                    <option value="en">English (en)</option>
+                    <option value="pt">Portuguese (pt)</option>
+                    <option value="es">Spanish (es)</option>
+                    <option value="ru">Russian (ru)</option>
+                    <option value="tr">Turkish (tr)</option>
+                    <option value="fr">French (fr)</option>
+                  </select>
+                  <TranslateBtn onClick={handleSend} />
+                </div>
               </div>
-              {/* Language Selector */}
-              <div className="flex mb-4">
-                <select
-                  className="p-3 rounded-md dark:bg-gray-700 dark:text-white flex-1"
-                  value={selectedLanguage}
-                  onChange={(e) => setSelectedLanguage(e.target.value)}
-                >
-                  <option value="en">English (en)</option>
-                  <option value="pt">Portuguese (pt)</option>
-                  <option value="es">Spanish (es)</option>
-                  <option value="ru">Russian (ru)</option>
-                  <option value="tr">Turkish (tr)</option>
-                  <option value="fr">French (fr)</option>
-                </select>
-                <Button
-                  className="ml-4 bg-[#51DA4C] text-white"
-                  onClick={handleSend} // Trigger translation action
-                >
-                  Translate
-                </Button>
-              </div>
+
               {/* Summarize Button */}
               {input.length > 150 && detectedLanguage === "en" && (
                 <Button
