@@ -9,7 +9,7 @@ const TranslateBtn: React.FC<TranslateBtnProps> = ({ onClick }) => {
   return (
     <StyledWrapper>
       <div>
-        <button className="button">
+        <button className="button" onClick={onClick}>
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width={16}

@@ -10,7 +10,7 @@ const SendBtn: React.FC<SendBtnProps> = ({ onClick }) => {
   return (
     <StyledWrapper>
       <div>
-        <button className="button">
+        <button className="button" onClick={onClick}>
           <Send />
         </button>
       </div>

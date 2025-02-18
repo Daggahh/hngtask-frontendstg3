@@ -5,10 +5,12 @@ import { useState } from "react";
 import "@/app/styles/welcomePage.css";
 import Header from "@/components/Header";
 import Footer from "../components/Footer";
+import { useToast } from "@/hooks/use-toast"
 
 export default function Home() {
   const [name, setName] = useState<string>("");
   const router = useRouter();
+  const { toast } = useToast()
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setName(e.target.value);
@@ -38,14 +40,19 @@ export default function Home() {
           </p>
           <input
             type="text"
-            className="border-2 p-3 rounded-md mb-4 w-full text-gray-800 dark:text-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-[#51DA4C]"
+            className="border-2 p-3 rounded-md mb-4 w-full text-gray-800 dark:text-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-700 dark:focus:ring-gray-300"
             placeholder="Enter your username"
             value={name}
             onChange={handleNameChange}
           />
           <button
             className="cssbuttons-io-button flex mx-auto"
-            onClick={handleStartProcessing}
+            onClick={() => {
+              handleStartProcessing();
+              toast({
+                description: "Welcome to AIFlow!",
+              });
+            }}
           >
             Get started
             <div className="icon">

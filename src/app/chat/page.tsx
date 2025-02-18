@@ -14,6 +14,8 @@ import { Input } from "@/components/ui/input";
 import SendBtn from "@/components/sendBtn";
 import { useEffect, useState } from "react";
 import TranslateBtn from "@/components/translateBtn";
+import { LogOutIcon } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 export default function chatPage() {
   const [input, setInput] = useState("");
@@ -23,6 +25,7 @@ export default function chatPage() {
   const [summaryText, setSummaryText] = useState<string | null>(null);
   const [selectedLanguage, setSelectedLanguage] = useState<string>("en");
   const [userName, setUserName] = useState<string | null>(null);
+  const router = useRouter();
 
   useEffect(() => {
     const storedChats = localStorage.getItem("chats");
@@ -58,6 +61,15 @@ export default function chatPage() {
     }
   };
 
+  const handleLogout = () => {
+    localStorage.removeItem("userName");
+    localStorage.removeItem("chats");
+    setUserName(null);
+    setChats([]);
+
+    router.push("/ && window.location.reload()");
+  };
+
   return (
     <SidebarProvider>
       <AppSidebar />
@@ -71,7 +83,10 @@ export default function chatPage() {
                 Welcome {userName}!
               </h1>
             </div>
-            <Switch />
+            <div className="flex items-center gap-2">
+              <LogOutIcon className="cursor-pointer hover:bg-gray-300 rounded-full" onClick={handleLogout} />
+              <Switch />
+            </div>
           </div>
         </header>
         <div className="flex flex-1 flex-col gap-4 p-[0.3rem]">
@@ -83,7 +98,7 @@ export default function chatPage() {
                   chats.map((chat, index) => (
                     <p
                       key={index}
-                      className="text-gray-800 dark:text-gray-300 mb-2"
+                      className="text-gray-800 dark:text-gray-300 mb-2 p-4"
                     >
                       {chat.message}
                     </p>
@@ -96,21 +111,21 @@ export default function chatPage() {
 
                 {/* Detected Language Display */}
                 {detectedLanguage && (
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 pl-4">
                     Detected Language: {detectedLanguage}
                   </p>
                 )}
 
                 {/* Summarized Output */}
                 {summaryText && (
-                  <p className="text-sm text-gray-600 dark:text-gray-300 mt-2">
+                  <p className="text-sm text-gray-600 dark:text-gray-300 mt-2 pl-4 pr-4">
                     Summary: {summaryText}
                   </p>
                 )}
 
                 {/* Translated Output */}
                 {translatedText && (
-                  <p className="text-sm text-gray-600 dark:text-gray-300 mt-2">
+                  <p className="text-sm text-gray-600 dark:text-gray-300 mt-2 pl-4 pr-4">
                     Translated Text: {translatedText}
                   </p>
                 )}
@@ -120,7 +135,7 @@ export default function chatPage() {
                 {/* Chat Input Box */}
                 <div className="flex flex-col md:flex-row mb-4">
                   <Input
-                    className="flex-1 p-3 h-[3.75rem] rounded-md dark:bg-gray-700 dark:text-white focus:ring-[#51DA4C] mb-4 md:mb-0"
+                    className="flex-1 p-3 h-[3.75rem] bg-white rounded-md dark:bg-gray-700 dark:text-white focus:ring-[#51DA4C] mb-4 md:mb-0"
                     placeholder="Type a message..."
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
