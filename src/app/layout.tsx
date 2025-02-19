@@ -1,4 +1,3 @@
-import { Roboto, Roboto_Flex } from "@next/font";
 import "@/app/globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/toaster";
@@ -16,15 +15,6 @@ export const metadata: Metadata = {
   },
 };
 
-const roboto = Roboto({
-  subsets: ["latin", "latin-ext"],
-  weight: ["100", "300", "400", "500", "700", "900"],
-});
-const robotoFlex = Roboto_Flex({
-  subsets: ["latin", "latin-ext"],
-  weight: "variable",
-});
-
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -32,7 +22,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${roboto.className} ${robotoFlex.className}`}>
+      <body>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <div className="min-h-screen transition-colors duration-500">
             <ClientLayout>{children}</ClientLayout>

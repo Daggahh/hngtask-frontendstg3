@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Switch from "@/components/switch";
 import { AppSidebar } from "@/components/app-sidebar";
 import { Separator } from "@/components/ui/separator";
@@ -18,6 +18,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { motion } from "framer-motion";
 import SendBtn from "@/components/sendBtn";
 import TranslateBtn from "@/components/translateBtn";
+import SummaryModal from "@/components/SummaryModal";
 
 export default function chatPage() {
   const [input, setInput] = useState("");
@@ -31,8 +32,15 @@ export default function chatPage() {
   const [summaryTries, setSummaryTries] = useState(0);
   const [translateTries, setTranslateTries] = useState(0);
   const [detectedLanguageTries, setDetectedLanguageTries] = useState(0);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const router = useRouter();
+  const detectingLanguage = useRef(false);
+  const options = {
+    type: "key-points" as "key-points" | "tl;dr" | "teaser" | "headline",
+    format: "markdown" as "markdown" | "plain-text",
+    length: "short" as "short" | "medium" | "long",
+  };
 
   useEffect(() => {
     const storedUserName = localStorage.getItem("userName");
@@ -56,25 +64,16 @@ export default function chatPage() {
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
         handleSend();
-        handleTranslate();
       }
     };
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [input]);
 
-  useEffect(() => {
+  const handleSend = async () => {
     if (!input.trim()) return;
-
-    const timeout = setTimeout(() => {
-      handleDetectLanguage();
-    }, 500);
-
-    return () => clearTimeout(timeout);
-  }, [input]);
-
-  const handleSend = () => {
-    if (!input.trim()) return;
+    setLoading(true);
+    await handleDetectLanguage();
 
     const newChat = { message: input, date: new Date().toLocaleString() };
     setChats((prevChats) => {
@@ -83,21 +82,16 @@ export default function chatPage() {
       return updatedChats;
     });
 
-    // Save to local storage using batched updates
-    setTimeout(() => {
-      localStorage.setItem("chats", JSON.stringify([...chats, newChat]));
-    }, 500);
-
     setInput("");
-    setDetectedLanguage("en");
-
-    if (input.length > 150) setSummaryText(input.slice(0, 150) + "...");
-
-    if (selectedLanguage !== "en") setTranslatedText(input);
+    setLoading(false);
   };
 
-  const handleSummarize = async () => {
-    if (!input.trim()) return;
+  const handleSummarize = async (options: { type: string; format: string; length: string }) => {
+    setIsModalOpen(false);
+
+    if (!input.trim() || detectedLanguage !== "en" || input.length < 150)
+      return;
+
     setLoading(true);
     setSummaryText(null);
     let attempts = 0;
@@ -119,7 +113,7 @@ export default function chatPage() {
         const data = await res.json();
         setSummaryText(data.summary);
         setLoading(false);
-        break;
+        return;
       } catch (error) {
         attempts++;
         setSummaryTries(attempts);
@@ -130,7 +124,7 @@ export default function chatPage() {
           duration: 3000,
           description: "An error occurred. Please try again.",
           action: (
-            <Button onClick={handleSummarize} className="bg-red-500 text-white">
+            <Button onClick={() => handleSummarize(options)} className="bg-red-500 text-white">
               Try Again
             </Button>
           ),
@@ -191,20 +185,22 @@ export default function chatPage() {
     }
 
     toast({
-      variant: "destructive",
       title: "API Call Failed",
       description: "Please try again later.",
+      variant: "destructive",
     });
 
     setLoading(false);
   };
 
   const handleDetectLanguage = async () => {
-    if (!input.trim() || loading) return;
+    if (!input.trim() || loading || detectingLanguage.current) return;
+    detectingLanguage.current = true;
+
     setLoading(true);
     setDetectedLanguage("");
-    let attempts = 0;
 
+    let attempts = 0;
     while (attempts < 2) {
       try {
         const res = await fetch("/api/detect-language", {
@@ -226,7 +222,7 @@ export default function chatPage() {
         setDetectedLanguageTries(attempts);
 
         toast({
-          title: "Detection Failed",
+          title: "Couldn't Detect Language",
           variant: "destructive",
           description: "An error occurred. Please try again.",
           action: (
@@ -242,9 +238,9 @@ export default function chatPage() {
     }
 
     toast({
-      variant: "destructive",
       title: "API Call Failed",
       description: "Please try again later.",
+      variant: "destructive",
     });
 
     setLoading(false);
@@ -269,6 +265,9 @@ export default function chatPage() {
     localStorage.removeItem("chats");
     setUserName(null);
     setChats([]);
+    setDetectedLanguage(null);
+    setTranslatedText(null);
+    setSummaryText(null);
 
     router.push("/");
   };
@@ -318,16 +317,23 @@ export default function chatPage() {
                 )}
 
                 {/* Summarize Button */}
-                {input.length > 150 &&
-                  detectedLanguage === "en" &&
-                  !summaryText && (
+                {(document.querySelector("#userInput") as HTMLTextAreaElement)
+                  ?.value.length > 150 &&
+                  detectedLanguage === "en" && (
                     <Button
                       className="bg-[#111313] font-semibold dark:bg-[#1f2937] text-white w-full mt-2"
-                      onClick={handleSummarize}
+                      onClick={() => setIsModalOpen(true)}
                     >
                       Summarize
                     </Button>
                   )}
+
+                {/* Summary Modal */}
+                <SummaryModal
+                  isOpen={isModalOpen}
+                  onClose={() => setIsModalOpen(false)}
+                  onSummarize={handleSummarize}
+                />
 
                 {/* Detected Language Display */}
                 {detectedLanguage && (
@@ -388,7 +394,7 @@ export default function chatPage() {
                 {/* Chat Input Box */}
                 <div className="flex flex-row md:flex-row mb-4">
                   <textarea
-                    id="user-input"
+                    id="userInput"
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     placeholder="Type your text here..."
@@ -441,7 +447,7 @@ export default function chatPage() {
                     </span>
                   </div>
 
-                  <TranslateBtn onClick={handleSend} />
+                  <TranslateBtn onClick={handleTranslate} />
                 </div>
               </div>
             </div>

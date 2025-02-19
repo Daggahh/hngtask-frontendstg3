@@ -41,13 +41,6 @@ export default function Home() {
       });
       router.push("/chat");
     }
-
-    onkeydown = (e) => {
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
-        handleStart();
-      }
-    };
   };
 
   return (
