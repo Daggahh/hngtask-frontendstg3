@@ -2,6 +2,7 @@ import "@/app/globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/toaster";
 import type { Metadata } from "next";
+import ClientLayout from "./ClientLayout";
 
 export const metadata: Metadata = {
   title: "AIFlow",
@@ -24,9 +25,9 @@ export default function RootLayout({
       <body>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <div className="min-h-screen transition-colors duration-500">
-            {children}
+            <ClientLayout>{children}</ClientLayout>
           </div>
-          <Toaster /> 
+          <Toaster />
         </ThemeProvider>
       </body>
     </html>

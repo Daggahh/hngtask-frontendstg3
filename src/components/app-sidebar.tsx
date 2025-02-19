@@ -194,7 +194,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
                   <TooltipProvider>
                     <Tooltip>
-                      <TooltipTrigger className="flex">
+                      <TooltipTrigger className="flex" asChild>
                         <button className="h-10 rounded-lg px-2 text-gray-900 dark:text-gray-400 focus-visible:bg-gray-500 focus-visible:outline-0 enabled:hover:bg-gray-500">
                           <svg
                             width="24"

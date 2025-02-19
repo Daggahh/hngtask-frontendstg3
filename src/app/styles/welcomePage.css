@@ -1,5 +1,5 @@
 /* Light Mode */
-.cssbuttons-io-button {
+.io--btn {
   background: #282F3C;
   color: white;
   font-family: inherit;
@@ -20,7 +20,7 @@
   cursor: pointer;
 }
 
-.cssbuttons-io-button .icon {
+.io--btn .icon {
   background: #111827;
   margin-left: 1em;
   position: absolute;
@@ -35,32 +35,32 @@
   transition: all 0.3s;
 }
 
-.cssbuttons-io-button:hover .icon {
+.io--btn:hover .icon {
   width: calc(100% - 0.6em);
 }
 
-.cssbuttons-io-button .icon svg {
+.io--btn .icon svg {
   width: 1.1em;
   transition: transform 0.3s;
   color: #7b52b9;
 }
 
-.cssbuttons-io-button:hover .icon svg {
+.io--btn:hover .icon svg {
   transform: translateX(0.1em);
 }
 
-.cssbuttons-io-button:active .icon {
+.io--btn:active .icon {
   transform: scale(0.95);
 }
 
 /* Dark Mode */
-.dark .cssbuttons-io-button {
+.dark .io--btn {
   background: #DCF8DB;
   color: #1f2937;
   box-shadow: inset 0 0 1.6em -0.6em #dcf8db80;
 }
 
-.dark .cssbuttons-io-button .icon {
+.dark .io--btn .icon {
   background: #b8ccb7;
   box-shadow: 0.1em 0.1em 0.6em 0.2em #dcf8db80;
 }

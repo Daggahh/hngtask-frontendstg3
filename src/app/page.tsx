@@ -4,21 +4,41 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import "@/app/styles/welcomePage.css";
 import Header from "@/components/Header";
-import Footer from "../components/Footer";
-import { useToast } from "@/hooks/use-toast"
+import Footer from "@/components/Footer";
+import { useToast } from "@/hooks/use-toast";
+
+/**
+ * Home component serves as the welcome page for AIFlow.
+ * It allows users to enter their username and proceed to the chat page.
+ */
 
 export default function Home() {
   const [name, setName] = useState<string>("");
   const router = useRouter();
-  const { toast } = useToast()
+  const { toast } = useToast();
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setName(e.target.value);
   };
 
-  const handleStartProcessing = () => {
+  const handleStart = () => {
+    const username = localStorage.getItem("userName");
+
+    if (!name && !username) {
+      toast({
+        description: "Please enter a username before proceeding!",
+        variant: "destructive",
+        duration: 3000,
+      });
+      return;
+    }
+
     if (name) {
       localStorage.setItem("userName", name);
+      toast({
+        description: "Welcome to AIFlow!",
+        duration: 3000,
+      });
       router.push("/chat");
     }
   };
@@ -46,13 +66,8 @@ export default function Home() {
             onChange={handleNameChange}
           />
           <button
-            className="cssbuttons-io-button flex mx-auto"
-            onClick={() => {
-              handleStartProcessing();
-              toast({
-                description: "Welcome to AIFlow!",
-              });
-            }}
+            className="io--btn flex mx-auto"
+            onClick={handleStart}
           >
             Get started
             <div className="icon">

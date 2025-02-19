@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import Switch from "@/components/switch";
 import { AppSidebar } from "@/components/app-sidebar";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -7,15 +9,16 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import Switch from "@/components/switch";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import SendBtn from "@/components/sendBtn";
-import { useEffect, useState } from "react";
-import TranslateBtn from "@/components/translateBtn";
 import { LogOutIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { toast } from "@/hooks/use-toast";
+import { Skeleton } from "@/components/ui/skeleton";
+import { motion } from "framer-motion";
+import SendBtn from "@/components/sendBtn";
+import TranslateBtn from "@/components/translateBtn";
 
 export default function chatPage() {
   const [input, setInput] = useState("");
@@ -25,6 +28,8 @@ export default function chatPage() {
   const [summaryText, setSummaryText] = useState<string | null>(null);
   const [selectedLanguage, setSelectedLanguage] = useState<string>("en");
   const [userName, setUserName] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [summaryTries, setSummaryTries] = useState(0);
   const router = useRouter();
 
   useEffect(() => {
@@ -61,6 +66,56 @@ export default function chatPage() {
     }
   };
 
+  const handleSummarize = async () => {
+    setLoading(true);
+    setSummaryText(null);
+    let attempts = 0;
+
+    while (attempts < 2) {
+      try {
+        const res = await fetch("/api/summarize", {
+          method: "POST",
+          body: JSON.stringify({ text: input }),
+          headers: {
+            "Content-Type": "application/json",
+          },
+        });
+
+        if (!res.ok) {
+          throw new Error("Failed to summarize text");
+        }
+
+        const data = await res.json();
+        setSummaryText(data.summary);
+        setLoading(false);
+        break;
+      } catch (error) {
+        attempts++;
+        setSummaryTries(attempts);
+
+        toast({
+          title: "Failed to summarize text",
+          variant: "destructive",
+          duration: 3000,
+          description: "An error occurred. Please try again.",
+          action: (
+            <Button onClick={handleSummarize} className="bg-red-500 text-white">
+              Try Again
+            </Button>
+          ),
+        });
+      }
+    }
+
+    toast({
+      variant: "destructive",
+      title: "API Call Failed",
+      description: "Please try again later.",
+    });
+
+    setLoading(false);
+  };
+
   const handleLogout = () => {
     localStorage.removeItem("userName");
     localStorage.removeItem("chats");
@@ -84,7 +139,10 @@ export default function chatPage() {
               </h1>
             </div>
             <div className="flex items-center gap-2">
-              <LogOutIcon className="cursor-pointer hover:bg-gray-300 rounded-full" onClick={handleLogout} />
+              <LogOutIcon
+                className="cursor-pointer hover:bg-gray-300 rounded-full"
+                onClick={handleLogout}
+              />
               <Switch />
             </div>
           </div>
@@ -109,6 +167,18 @@ export default function chatPage() {
                   </p>
                 )}
 
+                {/* Summarize Button */}
+                {input.length > 150 &&
+                  detectedLanguage === "en" &&
+                  !summaryText && (
+                    <Button
+                      className="bg-[#111313] font-semibold dark:bg-[#1f2937] text-white w-full mt-2"
+                      onClick={handleSummarize}
+                    >
+                      Summarize
+                    </Button>
+                  )}
+
                 {/* Detected Language Display */}
                 {detectedLanguage && (
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 pl-4">
@@ -117,10 +187,24 @@ export default function chatPage() {
                 )}
 
                 {/* Summarized Output */}
-                {summaryText && (
-                  <p className="text-sm text-gray-600 dark:text-gray-300 mt-2 pl-4 pr-4">
-                    Summary: {summaryText}
-                  </p>
+                {loading ? (
+                  <div className="mt-2 p-4">
+                    <p className="text-sm text-gray-600 dark:text-gray-300">
+                      Summary:{" "}
+                      <Skeleton className="w-3/4 h-5 bg-gray-300 dark:bg-gray-600 mt-2" />
+                    </p>
+                  </div>
+                ) : (
+                  summaryText && (
+                    <motion.p
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ duration: 1.5, ease: "easeOut" }}
+                      className="text-sm text-gray-600 dark:text-gray-300 mt-2 p-4"
+                    >
+                      Summary: {summaryText}
+                    </motion.p>
+                  )
                 )}
 
                 {/* Translated Output */}
@@ -133,7 +217,7 @@ export default function chatPage() {
 
               <div className="flex flex-col">
                 {/* Chat Input Box */}
-                <div className="flex flex-col md:flex-row mb-4">
+                <div className="flex flex-row md:flex-row mb-4">
                   <Input
                     className="flex-1 p-3 h-[3.75rem] bg-white rounded-md dark:bg-gray-700 dark:text-white focus:ring-[#51DA4C] mb-4 md:mb-0"
                     placeholder="Type a message..."
@@ -160,16 +244,6 @@ export default function chatPage() {
                   <TranslateBtn onClick={handleSend} />
                 </div>
               </div>
-
-              {/* Summarize Button */}
-              {input.length > 150 && detectedLanguage === "en" && (
-                <Button
-                  className="bg-[#51DA4C] text-white w-full mt-2"
-                  onClick={handleSend} // Trigger summarize action
-                >
-                  Summarize
-                </Button>
-              )}
             </div>
           </div>
         </div>
