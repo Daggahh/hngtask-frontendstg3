@@ -41,6 +41,13 @@ export default function Home() {
       });
       router.push("/chat");
     }
+
+    onkeydown = (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        handleStart();
+      }
+    };
   };
 
   return (
@@ -64,10 +71,14 @@ export default function Home() {
             placeholder="Enter your username"
             value={name}
             onChange={handleNameChange}
+            aria-label="input area"
+            role="inputbox"
           />
           <button
             className="io--btn flex mx-auto"
             onClick={handleStart}
+            aria-label="Get started button"
+            role="button"
           >
             Get started
             <div className="icon">

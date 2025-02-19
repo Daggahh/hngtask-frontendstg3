@@ -21,6 +21,8 @@ const Switch = () => {
           className="theme-switch__checkbox"
           defaultChecked={theme === "dark"}
           onChange={() => setTheme(theme === "light" ? "dark" : "light")}
+          aria-label="theme toggle"
+          role="checkbox"
         />
         <div className="theme-switch__container">
           <div className="theme-switch__clouds" />

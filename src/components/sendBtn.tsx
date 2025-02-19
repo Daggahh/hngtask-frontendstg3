@@ -8,12 +8,15 @@ interface SendBtnProps {
 
 const SendBtn: React.FC<SendBtnProps> = ({ onClick }) => {
   return (
-    <StyledWrapper>
-      <div>
-        <button className="button" onClick={onClick}>
+    <StyledWrapper className="flex items-center">
+        <button
+          className="button"
+          onClick={onClick}
+          aria-label="process text"
+          role="button"
+        >
           <Send />
         </button>
-      </div>
     </StyledWrapper>
   );
 };
