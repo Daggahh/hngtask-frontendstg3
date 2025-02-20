@@ -7,7 +7,7 @@ interface TranslateBtnProps {
 
 const TranslateBtn: React.FC<TranslateBtnProps> = ({ onClick }) => {
   return (
-    <StyledWrapper>
+    <StyledWrapper className="flex items-center">
       <button
         className="button"
         onClick={onClick}

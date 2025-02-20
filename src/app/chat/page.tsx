@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Switch from "@/components/switch";
 import { AppSidebar } from "@/components/app-sidebar";
 import { Separator } from "@/components/ui/separator";
@@ -19,12 +19,13 @@ import SendBtn from "@/components/sendBtn";
 import TranslateBtn from "@/components/translateBtn";
 import SummaryModal from "@/components/summaryModal";
 import { useChatState } from "@/hooks/useChatState";
-import { apiService } from "@/services/api";
 import { useChatActions } from "@/hooks/useChatActions";
 
-export default function chatPage() {
+export default function ChatPage() {
   const router = useRouter();
   const state = useChatState();
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
   const {
     handleSend,
     handleSummarize,
@@ -36,25 +37,18 @@ export default function chatPage() {
   useEffect(() => {
     const loadUserData = () => {
       const storedUserName = localStorage.getItem("userName");
-      const pastChats = JSON.parse(localStorage.getItem("pastChats") || "[]");
 
       if (storedUserName) {
         state.setUserName(storedUserName);
 
-        const userChatHistory = pastChats.find(
-          (chat: {
-            user: string;
-            chats: { message: string; date: string }[];
-          }) => chat.user === storedUserName
-        );
-        if (userChatHistory) {
-          state.setChats(userChatHistory.chats);
-        }
+        state.setChats([]);
+      } else {
+        router.push("/");
       }
     };
 
     loadUserData();
-  }, []);
+  }, [router, state.setChats, state.setUserName]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -65,7 +59,7 @@ export default function chatPage() {
     };
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [state.input]);
+  }, [state.input, handleSend]);
 
   const handleInputChange = useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -102,93 +96,162 @@ export default function chatPage() {
           <div className="min-h-[100vh] flex-1 rounded-xl bg-muted/50 md:min-h-min">
             <div className="flex-1 flex flex-col rounded-xl h-full p-6">
               {/* Chat Output Box */}
-              <Card className="flex-1 rounded shadow bg-white dark:bg-gray-800 overflow-y-auto mb-4 -me-6 -ms-6 -mt-6 rounded-tl-xl rounded-tr-xl">
-                {state.chats.length > 0 ? (
-                  state.chats.map((chat, index) => (
-                    <p
-                      key={index}
-                      className="text-gray-800 dark:text-gray-300 mb-2 p-4"
-                    >
-                      {chat.message}
-                    </p>
-                  ))
-                ) : (
-                  <p className="text-gray-500 dark:text-gray-400 pt-4 pl-4">
+              <Card className="flex-1 rounded shadow bg-white dark:bg-gray-800 overflow-y-auto mb-4 -me-6 -ms-6 -mt-6 rounded-tl-xl rounded-tr-xl chat-output">
+                {state.chats.length === 0 ? (
+                  <p className="text-gray-500 dark:text-gray-400 mt-2 ml-2">
                     Start a conversation...
                   </p>
-                )}
-
-                {/* Summarize Button */}
-                {(document.querySelector("#userInput") as HTMLTextAreaElement)
-                  ?.value.length > 150 &&
-                  state.detectedLanguage === "en" && (
-                    <Button
-                      className="bg-[#111313] font-semibold dark:bg-[#1f2937] text-white w-full mt-2"
-                      onClick={() => state.setIsModalOpen(true)}
-                    >
-                      Summarize
-                    </Button>
-                  )}
-
-                {/* Summary Modal */}
-                <SummaryModal
-                  isOpen={state.isModalOpen}
-                  onClose={() => state.setIsModalOpen(false)}
-                  onSummarize={handleSummarize}
-                />
-
-                {/* Detected Language Display */}
-                {state.detectedLanguage && (
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 pl-4">
-                    Detected Language:{" "}
-                    {state.loading ? (
-                      <Skeleton className="w-1/2 h-5 bg-gray-300 dark:bg-gray-600 mt-2" />
-                    ) : (
-                      state.detectedLanguage
-                    )}
-                  </p>
-                )}
-
-                {/* Summarized Output */}
-                {state.loading ? (
-                  <div className="mt-2 p-4">
-                    <p className="text-sm text-gray-600 dark:text-gray-300">
-                      Summary:{" "}
-                      <Skeleton className="w-3/4 h-5 bg-gray-300 dark:bg-gray-600 mt-2" />
-                    </p>
-                  </div>
                 ) : (
-                  state.summaryText && (
-                    <motion.p
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ duration: 1.5, ease: "easeOut" }}
-                      className="text-sm text-gray-600 dark:text-gray-300 mt-2 p-4"
+                  state.chats.map((chat, index) => (
+                    <div
+                      key={index}
+                      className="mb-6 border-b border-gray-200 dark:border-gray-700 pb-4"
                     >
-                      Summary: {state.summaryText}
-                    </motion.p>
-                  )
-                )}
+                      {/* Main Message */}
+                      <div className="p-4">
+                        <p
+                          className={`${
+                            chat.error
+                              ? "text-red-500 dark:text-red-400"
+                              : "text-gray-800 dark:text-gray-300"
+                          }`}
+                        >
+                          {chat.error || chat.message}
+                        </p>
+                      </div>
 
-                {/* Translated Output */}
-                {state.loading ? (
-                  <div className="mt-2 p-4">
-                    <p className="text-sm text-gray-600 dark:text-gray-300">
-                      Translated Text:{" "}
-                      <Skeleton className="w-3/4 h-5 bg-gray-300 dark:bg-gray-600 mt-2" />
-                    </p>
-                  </div>
-                ) : (
-                  state.translatedText && (
-                    <motion.p
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ duration: 1.5, ease: "easeOut" }}
-                      className="text-sm text-gray-600 dark:text-gray-300 mt-2 p-4"
-                    >
-                      Translated Text: {state.translatedText}
-                    </motion.p>
-                  )
+                      {/* Summarize Button */}
+                      {state.chats.length > 0 &&
+                        state.chats[state.chats.length - 1].message.length >
+                          150 &&
+                        state.detectedLanguage === "en" && (
+                          <Button
+                            className="bg-[#111313] font-semibold w-fit text-white flex relative ml-auto mr-2 hover:bg-[#111313]"
+                            onClick={() => state.setIsModalOpen(true)}
+                          >
+                            Summarize
+                          </Button>
+                        )}
+
+                      {/* Summary Modal */}
+                      <SummaryModal
+                        isOpen={state.isModalOpen}
+                        onClose={() => state.setIsModalOpen(false)}
+                        onSummarize={handleSummarize}
+                      />
+
+                      {/* Detected Language Display */}
+                      {state.detectedLanguage && (
+                        <div className="flex items-center gap-2 mt-2 px-4">
+                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                            Detected Language:
+                          </span>
+                          {state.loading ? (
+                            <div className="flex-1">
+                              <Skeleton className="h-4 w-20" />
+                            </div>
+                          ) : (
+                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                              {state.detectedLanguage}
+                            </span>
+                          )}
+                        </div>
+                      )}
+
+                      {(state.summaryText || state.translatedText) &&
+                        index === state.chats.length - 1 && (
+                          <div className="ml-8 space-y-4">
+                            {/* Loading States */}
+                            {state.loading && (
+                              <div className="space-y-4">
+                                {state.processingSummary && (
+                                  <div className="border rounded-lg p-4 bg-gray-50 dark:bg-gray-800">
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-medium">
+                                        Summary:
+                                      </span>
+                                      <Skeleton className="h-4 w-[200px]" />
+                                    </div>
+                                  </div>
+                                )}
+                                {state.processingTranslation && (
+                                  <div className="border rounded-lg p-4 bg-gray-50 dark:bg-gray-800">
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-medium">
+                                        Translation:
+                                      </span>
+                                      <Skeleton className="h-4 w-[200px]" />
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Results */}
+                            {!state.loading && (
+                              <>
+                                {state.summaryText && (
+                                  <motion.div
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ duration: 0.5 }}
+                                    className="border rounded-lg p-4 bg-gray-50 dark:bg-gray-800 mt-2"
+                                  >
+                                    <div className="flex items-start gap-2">
+                                      <ChevronDownCircleIcon className="w-5 h-5 mt-1" />
+                                      <div>
+                                        <span className="font-medium">
+                                          Summary:
+                                        </span>
+                                        <motion.p
+                                          initial={{ opacity: 0 }}
+                                          animate={{ opacity: 1 }}
+                                          transition={{
+                                            duration: 1.5,
+                                            ease: "easeOut",
+                                          }}
+                                          className="mt-1"
+                                        >
+                                          {state.summaryText}
+                                        </motion.p>
+                                      </div>
+                                    </div>
+                                  </motion.div>
+                                )}
+                                {state.translatedText && (
+                                  <motion.div
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ duration: 0.5 }}
+                                    className="border rounded-lg p-4 bg-gray-50 dark:bg-gray-800"
+                                  >
+                                    <div className="flex items-start gap-2">
+                                      <ChevronDownCircleIcon className="w-5 h-5 mt-1" />
+                                      <div>
+                                        <span className="font-medium">
+                                          Translation:
+                                        </span>
+                                        <motion.p
+                                          initial={{ opacity: 0 }}
+                                          animate={{ opacity: 1 }}
+                                          transition={{
+                                            duration: 1.5,
+                                            ease: "easeOut",
+                                          }}
+                                          className="mt-1"
+                                        >
+                                          {state.translatedText}
+                                        </motion.p>
+                                      </div>
+                                    </div>
+                                  </motion.div>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        )}
+                    </div>
+                  ))
                 )}
               </Card>
 
@@ -196,9 +259,10 @@ export default function chatPage() {
                 {/* Chat Input Box */}
                 <div className="flex flex-row md:flex-row mb-4">
                   <textarea
+                    ref={inputRef}
                     id="userInput"
                     value={state.input}
-                    onChange={(e) => state.setInput(e.target.value)}
+                    onChange={handleInputChange}
                     placeholder="Type your text here..."
                     className="w-full min-h-[50px] max-h-[200px] resize-none overflow-y-auto border border-gray-300 bg-white rounded-md dark:bg-gray-700 p-2 focus:outline-none focus:ring-2 focus:ring-gray-700 dark:focus:ring-gray-300 transition-all"
                     onFocus={(e) => {
@@ -213,7 +277,9 @@ export default function chatPage() {
                       target.style.height = `${target.scrollHeight}px`; // Set to content height
                     }}
                     onBlur={(e) => (e.target.style.height = "50px")} // Shrinks back when unfocused
-                    aria-label="User input field"
+                    aria-label="Chat input"
+                    role="textbox"
+                    aria-multiline="true"
                   ></textarea>
                   <SendBtn onClick={handleSend} />
                 </div>
@@ -223,7 +289,6 @@ export default function chatPage() {
                   <div
                     className="relative w-full"
                     onClick={() => state.setIsOpen(!state.isOpen)}
-                    onBlur={() => state.setIsOpen(false)}
                   >
                     <select
                       className="p-3 rounded-md w-full bg-white dark:bg-gray-700 dark:text-white appearance-none"

@@ -141,3 +141,9 @@ html:not(.dark) body {
     @apply bg-background text-foreground;
   }
 }
+
+.chat-output {
+  max-height: calc(100vh - 220px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+}

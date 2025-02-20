@@ -4,6 +4,7 @@ import { useState } from "react";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -14,6 +15,7 @@ import {
 } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { HelpCircleIcon } from "lucide-react";
+import { useChatState } from "@/hooks/useChatState";
 
 interface SummaryModalProps {
   isOpen: boolean;
@@ -45,18 +47,28 @@ const SummaryModal: React.FC<SummaryModalProps> = ({
     }));
   };
 
+  const state = useChatState();
+
   const handleSummarize = () => {
     onSummarize(options);
     onClose();
+
+    // Add loading state
+    state.setLoading(true);
+    state.setSummaryText(null);
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="p-6 rounded-lg shadow-xl w-[90%] max-w-md">
+      <DialogContent
+        className="p-6 rounded-lg shadow-xl w-[90%] max-w-md"
+        aria-describedby="summary-modal"
+      >
         <DialogHeader>
-          <DialogTitle className="text-lg font-bold">
-            Customize Summary
-          </DialogTitle>
+          <DialogTitle>Summarize Text</DialogTitle>
+          <DialogDescription>
+            Choose your summarization preferences
+          </DialogDescription>
         </DialogHeader>
 
         <div className="mt-4 space-y-3">
@@ -128,7 +140,7 @@ const SummaryModal: React.FC<SummaryModalProps> = ({
             </Button>
             <Button
               onClick={handleSummarize}
-              className="bg-[#51DA4C] text-white"
+              className="bg-[#111313] hover:bg-[#111313] text-white"
             >
               Summarize
             </Button>
