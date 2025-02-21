@@ -51,8 +51,16 @@ interface StoredUserData {
   sessions: ChatSession[];
 }
 
+// Add this interface for grouped sessions
+interface GroupedSession {
+  sessionId: string;
+  lastMessage: ChatMessage;
+  messageCount: number;
+}
+
+// Update the GroupedChats interface
 interface GroupedChats {
-  [date: string]: ChatMessage[];
+  [date: string]: GroupedSession[];
 }
 
 interface AppSidebarProps {
@@ -70,6 +78,7 @@ export function AppSidebar({
 }: AppSidebarProps) {
   const [chatGroups, setChatGroups] = useState<GroupedChats>({});
 
+  // Update the loadChats function
   const loadChats = useCallback(() => {
     if (!userName) return;
 
@@ -80,20 +89,25 @@ export function AppSidebar({
       const userData = savedChats.find((data) => data.user === userName);
 
       if (userData?.sessions) {
-        // Flatten all chats from all sessions
-        const allChats = userData.sessions.flatMap((session) =>
-          session.chats.map((chat) => ({
-            ...chat,
+        // Sort sessions by latest message date
+        const sortedSessions = [...userData.sessions].sort((a, b) => {
+          const aLastMessage = a.chats[a.chats.length - 1];
+          const bLastMessage = b.chats[b.chats.length - 1];
+          return (
+            new Date(bLastMessage?.date || 0).getTime() -
+            new Date(aLastMessage?.date || 0).getTime()
+          );
+        });
+
+        const sessionLastMessages = sortedSessions
+          .map((session) => ({
             sessionId: session.sessionId,
+            lastMessage: session.chats[session.chats.length - 1],
+            messageCount: session.chats.length,
           }))
-        );
+          .filter((session) => session.lastMessage);
 
-        // Sort chats by date
-        const sortedChats = allChats.sort(
-          (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-        );
-
-        const grouped = formatChats(sortedChats);
+        const grouped = formatChats(sessionLastMessages);
         setChatGroups(grouped);
       }
     } catch (error) {
@@ -135,9 +149,14 @@ export function AppSidebar({
         );
 
         if (session) {
+          // Update localStorage first
+          localStorage.setItem("lastSessionId", chat.sessionId);
+
+          // Update URL
+          window.history.replaceState({}, "", `?session=${chat.sessionId}`);
+
+          // Update state
           onSessionSelect(chat.sessionId);
-          // Update URL with session ID without page reload
-          window.history.pushState({}, "", `?session=${chat.sessionId}`);
         }
       } catch (error) {
         console.error("Error loading session:", error);
@@ -211,33 +230,53 @@ export function AppSidebar({
               </SidebarMenuButton>
               <SidebarMenuSub>
                 {sortedGroups.length > 0 ? (
-                  sortedGroups.map(([date, chats]) => (
+                  // Update the JSX part that renders the chats
+                  sortedGroups.map(([date, sessions]) => (
                     <SidebarMenuSubItem key={date}>
-                      <div className="flex flex-col gap-2 w-full">
-                        <span className="text-sm font-medium text-muted-foreground px-4">
+                      <div className="flex flex-col gap-5 w-full">
+                        <span className="text-sm font-medium text-muted-foreground px-4 pl-0">
                           {date}
                         </span>
-                        {chats.map((chat) => (
+                        {sessions.map((session: GroupedSession) => (
                           <SidebarMenuSubButton
-                            key={chat.id}
-                            onClick={() => handleChatSelect(chat)}
-                            className={`w-full hover:bg-accent/50 transition-colors cursor-pointer ${
-                              chat.sessionId === currentSessionId
+                            key={session.sessionId}
+                            onClick={() =>
+                              handleChatSelect(session.lastMessage)
+                            }
+                            className={`w-full min-h-[80px] h-fit hover:bg-accent/50  border-b border-b-gray-300 transition-colors cursor-pointer ${
+                              session.sessionId === currentSessionId
                                 ? "bg-accent/50"
                                 : ""
                             }`}
                           >
-                            <div className="flex flex-col gap-1 px-4 py-2">
+                            <div className="flex flex-col gap-1 py-2">
                               <p className="line-clamp-2 text-sm">
-                                {chat.message}
+                                {session.lastMessage.message}
                               </p>
-                              <div className="flex items-center justify-between mt-1">
-                                <span className="text-xs text-muted-foreground">
-                                  {format(new Date(chat.date), "hh:mm a")}
+                              <div className="flex items-center justify-evenly mt-1 gap-2 text-xs text-muted-foreground">
+                                <span>
+                                  {format(
+                                    new Date(session.lastMessage.date),
+                                    "hh:mm a"
+                                  )}
                                 </span>
-                                {chat.relatedContent?.summary && (
+                                <span>•</span>
+                                <span>
+                                  {session.messageCount} message
+                                  {session.messageCount !== 1 ? "s" : ""}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {session.lastMessage.relatedContent
+                                  ?.summary && (
                                   <span className="text-xs text-green-500">
                                     Summary available
+                                  </span>
+                                )}
+                                {session.lastMessage.relatedContent
+                                  ?.translation && (
+                                  <span className="text-xs text-green-500">
+                                    Translation available
                                   </span>
                                 )}
                               </div>
@@ -264,12 +303,19 @@ export function AppSidebar({
   );
 }
 
-const formatChats = (chats: ChatMessage[]) => {
+// Update the formatChats function
+const formatChats = (
+  sessions: {
+    sessionId: string;
+    lastMessage: ChatMessage;
+    messageCount: number;
+  }[]
+) => {
   const today = new Date().toDateString();
   const yesterday = new Date(Date.now() - 86400000).toDateString();
 
-  return chats.reduce((groups: { [key: string]: ChatMessage[] }, chat) => {
-    const chatDate = new Date(chat.date);
+  return sessions.reduce((groups: GroupedChats, session) => {
+    const chatDate = new Date(session.lastMessage.date);
     const dateString = chatDate.toDateString();
 
     let groupKey = format(chatDate, "MMM dd, yyyy");
@@ -277,7 +323,11 @@ const formatChats = (chats: ChatMessage[]) => {
     if (dateString === yesterday) groupKey = "Yesterday";
 
     if (!groups[groupKey]) groups[groupKey] = [];
-    groups[groupKey].push(chat);
+    groups[groupKey].push({
+      sessionId: session.sessionId,
+      lastMessage: session.lastMessage,
+      messageCount: session.messageCount,
+    });
     return groups;
   }, {});
 };

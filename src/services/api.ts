@@ -122,21 +122,6 @@ const createTranslator = async (
   }
 };
 
-// Add language names mapping from the docs
-const LANGUAGE_NAMES = {
-  en: "English",
-  zh: "Chinese (Simplified)",
-  "zh-Hant": "Chinese (Traditional)",
-  ja: "Japanese",
-  pt: "Portuguese",
-  ru: "Russian",
-  es: "Spanish",
-  tr: "Turkish",
-  hi: "Hindi",
-  vi: "Vietnamese",
-  bn: "Bengali",
-};
-
 export const apiService: ApiService = {
   async detectLanguage(text: string) {
     try {

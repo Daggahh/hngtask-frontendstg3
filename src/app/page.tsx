@@ -56,7 +56,7 @@ export default function Home() {
             translation, and language detection.
           </p>
           <p className="text-gray-600 dark:text-gray-300 mb-6 text-left">
-            Let's create your profile, enter your username:
+            Let&apos;s create your profile, enter your username:
           </p>
           <input
             type="text"

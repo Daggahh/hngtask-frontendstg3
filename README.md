@@ -1,36 +1,94 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AIFlow - Text Processing Application
 
-## Getting Started
+AIFlow is a Next.js application that provides powerful text processing capabilities including translation, summarization, and language detection using Chrome's experimental AI features.
 
-First, run the development server:
+## Features
+
+- **Text Translation**: Translate text between multiple languages
+- **Text Summarization**: Generate concise summaries of long texts
+- **Language Detection**: Automatically detect the source language
+- **Chat History**: Save and manage chat sessions
+- **Dark Mode**: Toggle between light and dark themes
+- **Responsive Design**: Works on desktop and mobile devices
+
+## Prerequisites
+
+- Node.js 18+
+- Chrome browser with experimental features enabled
+- Windows/macOS/Linux
+
+## Setting Up Chrome
+
+1. Open Chrome and navigate to `chrome://flags/`
+2. Enable the following flags:
+   - Experimental Web Platform features
+   -Summary API
+   - Language Detection API
+   - Translation API
+3. Restart Chrome
+
+## Installation
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+# Clone the repository
+git clone https://github.com/Daggahh/hngtask-frontendstg3.git
+
+# Install dependencies
+npm install
+
+# Create a .env file and add required environment variables
+cp .env.example .env
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Running the Application
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+# Start development server
+npm run dev
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+# Build for production
+npm run build
 
-## Learn More
+# Start production server
+npm start
+```
 
-To learn more about Next.js, take a look at the following resources:
+Visit [http://localhost:3000](http://localhost:3000) to use the application.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Usage
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. Login with your USERname
+2. Type or paste text in the input area
+3. Use the toolbar to:
+   - Translate text
+   - Generate summaries
+4. View chat history in the sidebar
+5. Toggle between light/dark modes
 
-## Deploy on Vercel
+## Project Structure
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```
+src/
+├── app/          # Next.js pages and layouts
+├── components/   # React components
+├── hooks/        # Custom React hooks
+├── lib/          # Utility functions
+├── services/     # API services
+└── types/        # TypeScript types
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Technologies Used
+
+- Next.js 14
+- TypeScript
+- Tailwind CSS
+- Radix UI
+- Chrome AI APIs
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes
+4. Push to the branch
+5. Open a pull request

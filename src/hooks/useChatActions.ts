@@ -149,7 +149,7 @@ export const useChatActions = (
         state.setLoading(false);
       }
     },
-    [state.input, state.loading, executeWithRetry]
+    [state, executeWithRetry]
   );
 
   const handleSend = useCallback(async () => {
@@ -219,7 +219,7 @@ export const useChatActions = (
     } finally {
       state.setInput("");
     }
-  }, [state.input, state.currentSessionId, state.userName]);
+  }, [checkBrowserSupport, playMessageSound, validateText, state]);
 
   const handleSummarize = useCallback(
     async (options: SummarizeOptions) => {
@@ -348,7 +348,7 @@ export const useChatActions = (
         state.setProcessingSummary(false);
       }
     },
-    [state, executeWithRetry, checkBrowserSupport]
+    [playMessageSound, state, executeWithRetry, checkBrowserSupport]
   );
 
   const handleTranslate = useCallback(async () => {
@@ -470,7 +470,7 @@ export const useChatActions = (
               description: "Text has been successfully translated",
               variant: "default",
             });
-          } 
+          }
         },
         errorTitle: "Translation failed",
       });
@@ -487,7 +487,7 @@ export const useChatActions = (
       state.setLoading(false);
       state.setProcessingTranslation(false);
     }
-  }, [state, executeWithRetry, checkBrowserSupport]);
+  }, [playMessageSound, state, executeWithRetry, checkBrowserSupport]);
 
   const handleLogout = useCallback(() => {
     try {
@@ -511,7 +511,7 @@ export const useChatActions = (
     } catch (error) {
       console.error("Logout failed:", error);
     }
-  }, [state.userName, state.chats, router]);
+  }, [state, router]);
 
   return {
     handleSend,

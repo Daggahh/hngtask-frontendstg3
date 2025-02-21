@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import Switch from "@/components/switch";
 import { AppSidebar } from "@/components/app-sidebar";
 import { Separator } from "@/components/ui/separator";
@@ -21,78 +21,148 @@ import SummaryModal from "@/components/summaryModal";
 import { useChatState } from "@/hooks/useChatState";
 import { useChatActions } from "@/hooks/useChatActions";
 import { toast } from "@/hooks/use-toast";
+import { ChatSession, StoredUserData } from "@/types/chat.types";
 
 export default function ChatPage() {
   const router = useRouter();
   const state = useChatState();
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  const {
-    handleSend,
-    handleSummarize,
-    handleTranslate,
-    handleDetectLanguage,
-    handleLogout,
-  } = useChatActions(state, router);
+  const { handleSend, handleSummarize, handleTranslate, handleLogout } =
+    useChatActions(state, router);
 
   useEffect(() => {
-    // Load username from localStorage
-    const savedUserName = localStorage.getItem("userName");
-    if (!savedUserName) {
-      router.push("/");
-      return;
-    }
-    state.setUserName(savedUserName);
-
-    // Load current session
-    const savedChats = JSON.parse(localStorage.getItem("pastChats") || "[]");
-    const userChats = savedChats.find(
-      (chat: any) => chat.user === savedUserName
-    );
-
-    if (!state.currentSessionId) {
-      state.setCurrentSessionId(`session_${Date.now()}`);
-    }
-
-    if (userChats?.sessions) {
-      const currentSession = userChats.sessions.find(
-        (session: any) => session.sessionId === state.currentSessionId
-      );
-
-      if (currentSession) {
-        state.setChats(currentSession.chats);
+    const initializeSession = async () => {
+      const savedUserName = localStorage.getItem("userName");
+      if (!savedUserName) {
+        router.push("/");
+        return;
       }
-    }
-  }, []);
+      state.setUserName(savedUserName);
+
+      try {
+        // Get session ID from URL first
+        const urlParams = new URLSearchParams(window.location.search);
+        const sessionIdFromUrl = urlParams.get("session");
+
+        const savedChats = JSON.parse(
+          localStorage.getItem("pastChats") || "[]"
+        );
+        const userChats = savedChats.find(
+          (chat: StoredUserData) => chat.user === savedUserName
+        );
+
+        if (userChats?.sessions?.length > 0) {
+          let targetSessionId = sessionIdFromUrl;
+
+          // If no URL session, get the most recent session
+          if (!targetSessionId) {
+            const sortedSessions = [...userChats.sessions].sort((a, b) => {
+              const aLastMessage = a.chats[a.chats.length - 1];
+              const bLastMessage = b.chats[b.chats.length - 1];
+              return (
+                new Date(bLastMessage?.date || 0).getTime() -
+                new Date(aLastMessage?.date || 0).getTime()
+              );
+            });
+            targetSessionId = sortedSessions[0]?.sessionId;
+          }
+
+          // Find and load target session
+          const targetSession = userChats.sessions.find(
+            (s: ChatSession) => s.sessionId === targetSessionId
+          );
+
+          if (targetSession) {
+            if (targetSessionId) {
+              state.setCurrentSessionId(targetSessionId);
+            }
+            state.setChats(targetSession.chats);
+            if (targetSessionId) {
+              localStorage.setItem("lastSessionId", targetSessionId);
+            }
+
+            // Update URL if needed
+            if (!sessionIdFromUrl) {
+              window.history.replaceState(
+                {},
+                "",
+                `?session=${targetSessionId}`
+              );
+            }
+          } else {
+            createNewSession();
+          }
+        } else {
+          createNewSession();
+        }
+      } catch (error) {
+        console.error("Error initializing session:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load session",
+          variant: "destructive",
+        });
+      }
+    };
+
+    const createNewSession = () => {
+      const newSessionId = `session_${Date.now()}`;
+      state.setCurrentSessionId(newSessionId);
+      state.setChats([]);
+      localStorage.setItem("lastSessionId", newSessionId);
+      window.history.replaceState({}, "", `?session=${newSessionId}`);
+    };
+
+    initializeSession();
+  }, [router]);
 
   const handleNewChat = useCallback(() => {
-    const newSessionId = `session_${Date.now()}`;
-    state.setCurrentSessionId(newSessionId);
-    state.setChats([]);
-    state.resetState();
+    try {
+      const newSessionId = `session_${Date.now()}`;
 
-    // Update localStorage with new session
-    const savedChats = JSON.parse(localStorage.getItem("pastChats") || "[]");
-    const userIndex = savedChats.findIndex(
-      (chat: any) => chat.user === state.userName
-    );
+      // Update state
+      state.setCurrentSessionId(newSessionId);
+      state.setChats([]);
+      state.resetState();
 
-    if (userIndex >= 0) {
-      if (!savedChats[userIndex].sessions) {
-        savedChats[userIndex].sessions = [];
+      // Update localStorage
+      const savedChats = JSON.parse(localStorage.getItem("pastChats") || "[]");
+      const userIndex = savedChats.findIndex(
+        (chat: StoredUserData) => chat.user === state.userName
+      );
+
+      if (userIndex >= 0) {
+        if (!savedChats[userIndex].sessions) {
+          savedChats[userIndex].sessions = [];
+        }
+        savedChats[userIndex].sessions.unshift({
+          // Add to beginning of array
+          sessionId: newSessionId,
+          chats: [],
+        });
+      } else {
+        savedChats.push({
+          user: state.userName,
+          sessions: [{ sessionId: newSessionId, chats: [] }],
+        });
       }
-      savedChats[userIndex].sessions.push({
-        sessionId: newSessionId,
-        chats: [],
-      });
-    } else {
-      savedChats.push({
-        user: state.userName,
-        sessions: [{ sessionId: newSessionId, chats: [] }],
+
+      // Update localStorage and URL
+      localStorage.setItem("pastChats", JSON.stringify(savedChats));
+      localStorage.setItem("lastSessionId", newSessionId);
+      window.history.replaceState({}, "", `?session=${newSessionId}`);
+
+      // Dispatch event to update sidebar
+      window.dispatchEvent(new Event("chatUpdated"));
+    } catch (error) {
+      console.error("Error creating new chat:", error);
+      toast({
+        title: "Error",
+        description: "Failed to create new chat session",
+        variant: "destructive",
       });
     }
-
-    localStorage.setItem("pastChats", JSON.stringify(savedChats));
   }, [state]);
 
   const handleSessionSelect = useCallback(
@@ -112,6 +182,8 @@ export default function ChatPage() {
           state.setCurrentSessionId(sessionId);
           state.setChats(session.chats);
           state.setInput("");
+          localStorage.setItem("lastSessionId", sessionId);
+          window.history.pushState({}, "", `?session=${sessionId}`);
         }
       } catch (error) {
         console.error("Error loading session:", error);

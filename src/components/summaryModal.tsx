@@ -127,7 +127,7 @@ const SummaryModal: React.FC<SummaryModalProps> = ({
             <TooltipContent>
               <p>Choose summary type, format, and length.</p>
               <p>
-                Example: 'Key Points' gives bullet points, 'TL;DR' is a short
+                Example:  &apos;Key Points&apos; gives bullet points, &apos;TL;DR&apos; is a short
                 summary.
               </p>
             </TooltipContent>
