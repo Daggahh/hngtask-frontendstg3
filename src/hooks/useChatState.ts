@@ -6,6 +6,7 @@ export interface ChatMessage {
   message: string;
   date: string;
   error?: string;
+  detectedLanguage?: string;
   relatedContent?: {
     summary?: string;
     translation?: string;
@@ -45,6 +46,14 @@ export interface UseChatState {
   currentSessionId: string;
   setCurrentSessionId: (sessionId: string) => void;
   createNewSession: () => void;
+  loadedContent: {
+    [messageId: string]: {
+      summary?: boolean;
+      translation?: boolean;
+      languageDetected?: boolean;
+    };
+  };
+  setLoadedContent: (messageId: string, type: string, value: boolean) => void;
 }
 
 export const useChatState = (): UseChatState => {
@@ -63,6 +72,22 @@ export const useChatState = (): UseChatState => {
   const [processingTranslation, setProcessingTranslation] = useState(false);
   const [currentSessionId, setCurrentSessionId] = useState<string>(
     () => `session_${Date.now()}`
+  );
+  const [loadedContent, setLoadedContent] = useState<{ [key: string]: any }>(
+    {}
+  );
+
+  const updateLoadedContent = useCallback(
+    (messageId: string, type: string, value: boolean) => {
+      setLoadedContent((prev) => ({
+        ...prev,
+        [messageId]: {
+          ...(prev[messageId] || {}),
+          [type]: value,
+        },
+      }));
+    },
+    []
   );
 
   const resetState = useCallback(() => {
@@ -128,5 +153,7 @@ export const useChatState = (): UseChatState => {
     currentSessionId,
     setCurrentSessionId,
     createNewSession,
+    loadedContent,
+    setLoadedContent: updateLoadedContent,
   };
 };

@@ -3,7 +3,6 @@ import {
   SummarizeOptions,
   SummarizerOptions,
 } from "../types/api.types";
-import { toast } from "@/hooks/use-toast";
 
 const ORIGIN_TRIAL_TOKENS = {
   summarizer:
@@ -123,6 +122,21 @@ const createTranslator = async (
   }
 };
 
+// Add language names mapping from the docs
+const LANGUAGE_NAMES = {
+  en: "English",
+  zh: "Chinese (Simplified)",
+  "zh-Hant": "Chinese (Traditional)",
+  ja: "Japanese",
+  pt: "Portuguese",
+  ru: "Russian",
+  es: "Spanish",
+  tr: "Turkish",
+  hi: "Hindi",
+  vi: "Vietnamese",
+  bn: "Bengali",
+};
+
 export const apiService: ApiService = {
   async detectLanguage(text: string) {
     try {
@@ -207,8 +221,23 @@ export const apiService: ApiService = {
       // Try using Chrome's API
       if (window.ai?.translator) {
         const capabilities = await self.ai.translator.capabilities();
-        const sourceLang = (await this.detectLanguage(text)).data
-          .detectedLanguage;
+        const sourceLangResponse = await this.detectLanguage(text);
+
+        if (!sourceLangResponse.success) {
+          throw new Error("Could not detect source language");
+        }
+
+        const sourceLang = sourceLangResponse.data.detectedLanguage;
+        const isAvailable = await capabilities.languagePairAvailable(
+          sourceLang,
+          targetLang
+        );
+
+        if (!isAvailable) {
+          throw new Error(
+            `Translation from ${sourceLang} to ${targetLang} is not available`
+          );
+        }
 
         const translator = await createTranslator(sourceLang, targetLang);
         const translatedText = await translator.translate(text);

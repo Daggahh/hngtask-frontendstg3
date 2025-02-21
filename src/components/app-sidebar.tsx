@@ -3,13 +3,13 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { GalleryVerticalEnd, MessageSquarePlus } from "lucide-react";
 import { format } from "date-fns";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { toast } from "@/hooks/use-toast";
 
 import {
   Sidebar,
   SidebarContent,
-  SidebarGroup,
   SidebarHeader,
+  SidebarGroup,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
@@ -25,12 +25,25 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "./ui/tooltip";
-import { useChatState } from "@/hooks/useChatState";
 import logo from "../../public/textai.svg";
+
+interface ChatMessage {
+  id: string;
+  sessionId: string;
+  message: string;
+  date: string;
+  user: string | null;
+  error?: string;
+  detectedLanguage?: string;
+  relatedContent?: {
+    summary?: string;
+    translation?: string;
+  };
+}
 
 interface ChatSession {
   sessionId: string;
-  chats: ChatItem[];
+  chats: ChatMessage[];
 }
 
 interface StoredUserData {
@@ -38,53 +51,33 @@ interface StoredUserData {
   sessions: ChatSession[];
 }
 
-interface ChatItem {
-  id: string;
-  sessionId: string;
-  message: string;
-  date: string;
-  user: string;
-  relatedContent?: {
-    summary?: string;
-    translation?: string;
-  };
-}
-
 interface GroupedChats {
-  [date: string]: ChatItem[];
+  [date: string]: ChatMessage[];
 }
 
-const formatChats = (chats: ChatItem[]) => {
-  const today = new Date().toDateString();
-  const yesterday = new Date(Date.now() - 86400000).toDateString();
+interface AppSidebarProps {
+  onNewChat: () => void;
+  userName: string | null;
+  currentSessionId: string;
+  onSessionSelect: (sessionId: string) => void;
+}
 
-  return chats.reduce((groups: { [key: string]: ChatItem[] }, chat) => {
-    const chatDate = new Date(chat.date);
-    const dateString = chatDate.toDateString();
-
-    let groupKey = format(chatDate, "MMM dd, yyyy");
-    if (dateString === today) groupKey = "Today";
-    if (dateString === yesterday) groupKey = "Yesterday";
-
-    if (!groups[groupKey]) groups[groupKey] = [];
-    groups[groupKey].push(chat);
-    return groups;
-  }, {});
-};
-
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+export function AppSidebar({
+  onNewChat,
+  userName,
+  currentSessionId,
+  onSessionSelect,
+}: AppSidebarProps) {
   const [chatGroups, setChatGroups] = useState<GroupedChats>({});
-  const state = useChatState();
-  const router = useRouter();
 
   const loadChats = useCallback(() => {
-    if (!state.userName) return;
+    if (!userName) return;
 
     try {
       const savedChats = JSON.parse(
         localStorage.getItem("pastChats") || "[]"
       ) as StoredUserData[];
-      const userData = savedChats.find((data) => data.user === state.userName);
+      const userData = savedChats.find((data) => data.user === userName);
 
       if (userData?.sessions) {
         // Flatten all chats from all sessions
@@ -100,19 +93,24 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
         );
 
-        setChatGroups(formatChats(sortedChats));
-      } else {
-        setChatGroups({});
+        const grouped = formatChats(sortedChats);
+        setChatGroups(grouped);
       }
     } catch (error) {
       console.error("Error loading chats:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load chat history",
+        variant: "destructive",
+      });
       setChatGroups({});
     }
-  }, [state.userName]);
+  }, [userName]);
 
   useEffect(() => {
     loadChats();
 
+    // Listen for chat updates
     const handleUpdate = () => loadChats();
     window.addEventListener("chatUpdated", handleUpdate);
     window.addEventListener("storage", handleUpdate);
@@ -121,34 +119,36 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       window.removeEventListener("chatUpdated", handleUpdate);
       window.removeEventListener("storage", handleUpdate);
     };
-  }, [loadChats]);
-
-  const handleNewChat = useCallback(() => {
-    state.createNewSession(); // New method in useChatState
-    state.resetState();
-  }, [state]);
+  }, [loadChats, userName]);
 
   const handleChatSelect = useCallback(
-    (chat: ChatItem) => {
-      state.setCurrentSessionId(chat.sessionId);
-      state.resetState();
+    async (chat: ChatMessage) => {
+      try {
+        const savedChats = JSON.parse(
+          localStorage.getItem("pastChats") || "[]"
+        );
+        const userChats = savedChats.find(
+          (data: StoredUserData) => data.user === userName
+        );
+        const session = userChats?.sessions?.find(
+          (s: ChatSession) => s.sessionId === chat.sessionId
+        );
 
-      // Find all chats from the same session
-      const savedChats = JSON.parse(
-        localStorage.getItem("pastChats") || "[]"
-      ) as StoredUserData[];
-      const userData = savedChats.find((data) => data.user === state.userName);
-      const session = userData?.sessions.find(
-        (s) => s.sessionId === chat.sessionId
-      );
-
-      if (session) {
-        requestAnimationFrame(() => {
-          state.setChats(session.chats);
+        if (session) {
+          onSessionSelect(chat.sessionId);
+          // Update URL with session ID without page reload
+          window.history.pushState({}, "", `?session=${chat.sessionId}`);
+        }
+      } catch (error) {
+        console.error("Error loading session:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load chat session",
+          variant: "destructive",
         });
       }
     },
-    [state]
+    [userName, onSessionSelect]
   );
 
   const sortedGroups = useMemo(
@@ -160,7 +160,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   );
 
   return (
-    <Sidebar {...props}>
+    <Sidebar>
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
@@ -186,7 +186,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <MessageSquarePlus
-                          onClick={handleNewChat}
+                          onClick={onNewChat}
                           className="size-8 p-1.5 rounded-md hover:bg-accent cursor-pointer"
                         />
                       </TooltipTrigger>
@@ -207,7 +207,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton asChild>
-                <div className="font-medium">Chats History</div>
+                <div className="font-medium">Chat History</div>
               </SidebarMenuButton>
               <SidebarMenuSub>
                 {sortedGroups.length > 0 ? (
@@ -221,18 +221,22 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                           <SidebarMenuSubButton
                             key={chat.id}
                             onClick={() => handleChatSelect(chat)}
-                            className="w-full hover:bg-accent/50 transition-colors"
+                            className={`w-full hover:bg-accent/50 transition-colors cursor-pointer ${
+                              chat.sessionId === currentSessionId
+                                ? "bg-accent/50"
+                                : ""
+                            }`}
                           >
                             <div className="flex flex-col gap-1 px-4 py-2">
                               <p className="line-clamp-2 text-sm">
                                 {chat.message}
                               </p>
-                              <div className="flex items-center justify-between">
+                              <div className="flex items-center justify-between mt-1">
                                 <span className="text-xs text-muted-foreground">
-                                  {format(new Date(chat.date), "HH:mm")}
+                                  {format(new Date(chat.date), "hh:mm a")}
                                 </span>
                                 {chat.relatedContent?.summary && (
-                                  <span className="text-xs text-muted-foreground">
+                                  <span className="text-xs text-green-500">
                                     Summary available
                                   </span>
                                 )}
@@ -259,3 +263,21 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     </Sidebar>
   );
 }
+
+const formatChats = (chats: ChatMessage[]) => {
+  const today = new Date().toDateString();
+  const yesterday = new Date(Date.now() - 86400000).toDateString();
+
+  return chats.reduce((groups: { [key: string]: ChatMessage[] }, chat) => {
+    const chatDate = new Date(chat.date);
+    const dateString = chatDate.toDateString();
+
+    let groupKey = format(chatDate, "MMM dd, yyyy");
+    if (dateString === today) groupKey = "Today";
+    if (dateString === yesterday) groupKey = "Yesterday";
+
+    if (!groups[groupKey]) groups[groupKey] = [];
+    groups[groupKey].push(chat);
+    return groups;
+  }, {});
+};

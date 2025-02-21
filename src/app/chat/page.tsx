@@ -20,6 +20,7 @@ import TranslateBtn from "@/components/translateBtn";
 import SummaryModal from "@/components/summaryModal";
 import { useChatState } from "@/hooks/useChatState";
 import { useChatActions } from "@/hooks/useChatActions";
+import { toast } from "@/hooks/use-toast";
 
 export default function ChatPage() {
   const router = useRouter();
@@ -35,20 +36,94 @@ export default function ChatPage() {
   } = useChatActions(state, router);
 
   useEffect(() => {
-    const loadUserData = () => {
-      const storedUserName = localStorage.getItem("userName");
+    // Load username from localStorage
+    const savedUserName = localStorage.getItem("userName");
+    if (!savedUserName) {
+      router.push("/");
+      return;
+    }
+    state.setUserName(savedUserName);
 
-      if (storedUserName) {
-        state.setUserName(storedUserName);
+    // Load current session
+    const savedChats = JSON.parse(localStorage.getItem("pastChats") || "[]");
+    const userChats = savedChats.find(
+      (chat: any) => chat.user === savedUserName
+    );
 
-        state.setChats([]);
-      } else {
-        router.push("/");
+    if (!state.currentSessionId) {
+      state.setCurrentSessionId(`session_${Date.now()}`);
+    }
+
+    if (userChats?.sessions) {
+      const currentSession = userChats.sessions.find(
+        (session: any) => session.sessionId === state.currentSessionId
+      );
+
+      if (currentSession) {
+        state.setChats(currentSession.chats);
       }
-    };
+    }
+  }, []);
 
-    loadUserData();
-  }, [router, state.setChats, state.setUserName]);
+  const handleNewChat = useCallback(() => {
+    const newSessionId = `session_${Date.now()}`;
+    state.setCurrentSessionId(newSessionId);
+    state.setChats([]);
+    state.resetState();
+
+    // Update localStorage with new session
+    const savedChats = JSON.parse(localStorage.getItem("pastChats") || "[]");
+    const userIndex = savedChats.findIndex(
+      (chat: any) => chat.user === state.userName
+    );
+
+    if (userIndex >= 0) {
+      if (!savedChats[userIndex].sessions) {
+        savedChats[userIndex].sessions = [];
+      }
+      savedChats[userIndex].sessions.push({
+        sessionId: newSessionId,
+        chats: [],
+      });
+    } else {
+      savedChats.push({
+        user: state.userName,
+        sessions: [{ sessionId: newSessionId, chats: [] }],
+      });
+    }
+
+    localStorage.setItem("pastChats", JSON.stringify(savedChats));
+  }, [state]);
+
+  const handleSessionSelect = useCallback(
+    (sessionId: string) => {
+      try {
+        const savedChats = JSON.parse(
+          localStorage.getItem("pastChats") || "[]"
+        );
+        const userChats = savedChats.find(
+          (chat: any) => chat.user === state.userName
+        );
+        const session = userChats?.sessions?.find(
+          (s: any) => s.sessionId === sessionId
+        );
+
+        if (session) {
+          state.setCurrentSessionId(sessionId);
+          state.setChats(session.chats);
+          state.setInput("");
+        }
+      } catch (error) {
+        console.error("Error loading session:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load chat session",
+          variant: "destructive",
+        });
+      }
+    },
+    [state]
+  );
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -70,7 +145,12 @@ export default function ChatPage() {
 
   return (
     <SidebarProvider>
-      <AppSidebar />
+      <AppSidebar
+        onNewChat={handleNewChat}
+        userName={state.userName}
+        currentSessionId={state.currentSessionId}
+        onSessionSelect={handleSessionSelect}
+      />
       <SidebarInset className="bg-transparent">
         <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4 bg-white dark:bg-gray-900">
           <SidebarTrigger className="-ml-1" />
@@ -104,7 +184,7 @@ export default function ChatPage() {
                 ) : (
                   state.chats.map((chat, index) => (
                     <div
-                      key={index}
+                      key={chat.id}
                       className="mb-6 border-b border-gray-200 dark:border-gray-700 pb-4"
                     >
                       {/* Main Message */}
@@ -118,138 +198,107 @@ export default function ChatPage() {
                         >
                           {chat.error || chat.message}
                         </p>
-                      </div>
 
-                      {/* Summarize Button */}
-                      {state.chats.length > 0 &&
-                        state.chats[state.chats.length - 1].message.length >
-                          150 &&
-                        state.detectedLanguage === "en" && (
-                          <Button
-                            className="bg-[#111313] font-semibold w-fit text-white flex relative ml-auto mr-2 hover:bg-[#111313]"
-                            onClick={() => state.setIsModalOpen(true)}
-                          >
-                            Summarize
-                          </Button>
+                        {/* Detected Language - Show immediately */}
+                        {chat.detectedLanguage && (
+                          <div className="flex items-center gap-2 mt-2">
+                            <span className="text-xs text-gray-500">
+                              Detected Language: {chat.detectedLanguage}
+                            </span>
+                          </div>
                         )}
 
-                      {/* Summary Modal */}
-                      <SummaryModal
-                        isOpen={state.isModalOpen}
-                        onClose={() => state.setIsModalOpen(false)}
-                        onSummarize={handleSummarize}
-                      />
-
-                      {/* Detected Language Display */}
-                      {state.detectedLanguage && (
-                        <div className="flex items-center gap-2 mt-2 px-4">
-                          <span className="text-xs text-gray-500 dark:text-gray-400">
-                            Detected Language:
-                          </span>
-                          {state.loading ? (
-                            <div className="flex-1">
-                              <Skeleton className="h-4 w-20" />
-                            </div>
-                          ) : (
-                            <span className="text-xs text-gray-500 dark:text-gray-400">
-                              {state.detectedLanguage}
-                            </span>
+                        {/* Summarize Button */}
+                        {chat.message.length > 150 &&
+                          chat.detectedLanguage === "en" &&
+                          index === state.chats.length - 1 && (
+                            <Button
+                              className="bg-[#111313] font-semibold w-fit text-white flex relative ml-auto mr-2 hover:bg-[#111313]"
+                              onClick={() => state.setIsModalOpen(true)}
+                            >
+                              Summarize
+                            </Button>
                           )}
-                        </div>
-                      )}
 
-                      {(state.summaryText || state.translatedText) &&
-                        index === state.chats.length - 1 && (
-                          <div className="ml-8 space-y-4">
-                            {/* Loading States */}
-                            {state.loading && (
-                              <div className="space-y-4">
-                                {state.processingSummary && (
-                                  <div className="border rounded-lg p-4 bg-gray-50 dark:bg-gray-800">
-                                    <div className="flex items-center gap-2">
-                                      <span className="font-medium">
-                                        Summary:
-                                      </span>
-                                      <Skeleton className="h-4 w-[200px]" />
-                                    </div>
+                        {/* Summary Modal */}
+                        <SummaryModal
+                          isOpen={state.isModalOpen}
+                          onClose={() => state.setIsModalOpen(false)}
+                          onSummarize={handleSummarize}
+                        />
+
+                        {/* Related Content */}
+                        {chat.relatedContent && (
+                          <div className="mt-4 space-y-4">
+                            {chat.relatedContent.summary && (
+                              <motion.div
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="border rounded-lg p-4 bg-gray-50 dark:bg-gray-800"
+                              >
+                                <div className="flex items-start gap-2">
+                                  <ChevronDownCircleIcon className="w-5 h-5 mt-1" />
+                                  <div>
+                                    <span className="font-medium">
+                                      Summary:
+                                    </span>
+                                    <p className="mt-1">
+                                      {chat.relatedContent.summary}
+                                    </p>
                                   </div>
-                                )}
-                                {state.processingTranslation && (
-                                  <div className="border rounded-lg p-4 bg-gray-50 dark:bg-gray-800">
-                                    <div className="flex items-center gap-2">
-                                      <span className="font-medium">
-                                        Translation:
-                                      </span>
-                                      <Skeleton className="h-4 w-[200px]" />
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
+                                </div>
+                              </motion.div>
                             )}
 
-                            {/* Results */}
-                            {!state.loading && (
-                              <>
-                                {state.summaryText && (
-                                  <motion.div
-                                    initial={{ opacity: 0, y: 10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ duration: 0.5 }}
-                                    className="border rounded-lg p-4 bg-gray-50 dark:bg-gray-800 mt-2"
-                                  >
-                                    <div className="flex items-start gap-2">
-                                      <ChevronDownCircleIcon className="w-5 h-5 mt-1" />
-                                      <div>
-                                        <span className="font-medium">
-                                          Summary:
-                                        </span>
-                                        <motion.p
-                                          initial={{ opacity: 0 }}
-                                          animate={{ opacity: 1 }}
-                                          transition={{
-                                            duration: 1.5,
-                                            ease: "easeOut",
-                                          }}
-                                          className="mt-1"
-                                        >
-                                          {state.summaryText}
-                                        </motion.p>
-                                      </div>
-                                    </div>
-                                  </motion.div>
-                                )}
-                                {state.translatedText && (
-                                  <motion.div
-                                    initial={{ opacity: 0, y: 10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ duration: 0.5 }}
-                                    className="border rounded-lg p-4 bg-gray-50 dark:bg-gray-800"
-                                  >
-                                    <div className="flex items-start gap-2">
-                                      <ChevronDownCircleIcon className="w-5 h-5 mt-1" />
-                                      <div>
-                                        <span className="font-medium">
-                                          Translation:
-                                        </span>
-                                        <motion.p
-                                          initial={{ opacity: 0 }}
-                                          animate={{ opacity: 1 }}
-                                          transition={{
-                                            duration: 1.5,
-                                            ease: "easeOut",
-                                          }}
-                                          className="mt-1"
-                                        >
-                                          {state.translatedText}
-                                        </motion.p>
-                                      </div>
-                                    </div>
-                                  </motion.div>
-                                )}
-                              </>
+                            {chat.relatedContent.translation && (
+                              <motion.div
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="border rounded-lg p-4 bg-gray-50 dark:bg-gray-800"
+                              >
+                                <div className="flex items-start gap-2">
+                                  <ChevronDownCircleIcon className="w-5 h-5 mt-1" />
+                                  <div>
+                                    <span className="font-medium">
+                                      Translation:
+                                    </span>
+                                    <p className="mt-1">
+                                      {chat.relatedContent.translation}
+                                    </p>
+                                  </div>
+                                </div>
+                              </motion.div>
                             )}
                           </div>
                         )}
+
+                        {/* Processing States */}
+                        {index === state.chats.length - 1 && (
+                          <>
+                            {state.processingSummary && (
+                              <div className="mt-4 border rounded-lg p-4 bg-gray-50 dark:bg-gray-800">
+                                <div className="flex items-center gap-2">
+                                  <ChevronDownCircleIcon className="w-5 h-5" />
+                                  <span className="font-medium">Summary:</span>
+                                  <Skeleton className="h-4 w-[200px]" />
+                                </div>
+                              </div>
+                            )}
+
+                            {state.processingTranslation && (
+                              <div className="mt-4 border rounded-lg p-4 bg-gray-50 dark:bg-gray-800">
+                                <div className="flex items-center gap-2">
+                                  <ChevronDownCircleIcon className="w-5 h-5" />
+                                  <span className="font-medium">
+                                    Translation:
+                                  </span>
+                                  <Skeleton className="h-4 w-[200px]" />
+                                </div>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
                     </div>
                   ))
                 )}

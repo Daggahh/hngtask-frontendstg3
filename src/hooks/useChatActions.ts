@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
-import { UseChatState } from "./useChatState";
+import { ChatMessage, UseChatState } from "./useChatState";
 import { apiService } from "@/services/api";
 import { useRetry } from "./useRetry";
 import { SummarizeOptions } from "@/types/api.types";
@@ -11,7 +11,7 @@ interface ChatActions {
   handleSend: () => Promise<void>;
   handleSummarize: (options: SummarizeOptions) => Promise<void>;
   handleTranslate: () => Promise<void>;
-  handleDetectLanguage: () => Promise<void>;
+  handleDetectLanguage: (messageId: string) => Promise<void>;
   handleLogout: () => void;
 }
 
@@ -36,8 +36,10 @@ export const useChatActions = (
 
   //text validation
   const validateText = useCallback((text: string) => {
+    const trimmedText = text.trim();
+
     // Check for empty or short text
-    if (!text.trim() || text.trim().length < 3) {
+    if (!trimmedText || trimmedText.length < 3) {
       toast({
         title: "Invalid Input",
         description: "Please enter valid text",
@@ -47,7 +49,7 @@ export const useChatActions = (
     }
 
     // Check for numbers only
-    if (/^\d+$/.test(text.trim())) {
+    if (/^\d+$/.test(trimmedText)) {
       toast({
         title: "Invalid Input",
         description: "Please enter text, not just numbers",
@@ -56,78 +58,121 @@ export const useChatActions = (
       return false;
     }
 
-    // // Check for gibberish (basic check for random characters)
-    // if (!/^[\p{L}\s.,!?-]+$/u.test(text.trim())) {
+    // Detect gibberish patterns
+    const gibberishPatterns = {
+      repeatingLetters: /(.)\1{4,}/, // Same letter repeated 5+ times
+      noVowels: /^[^aeiou]+$/i, // No vowels
+      randomCharacters: /[^a-zA-Z0-9\s.,!?'-]{3,}/, // 3+ special chars in a row
+      repeatingWords: /\b(\w+)\s+\1\s+\1\b/, // Same word repeated 3+ times
+      alphabetStrings:
+        /^[a-zA-Z\s]+$/i.test(trimmedText) &&
+        /^(?:(?:abc|def|ghi|jkl|mno|pqr|stu|vwx|yz)\s*)+$/i.test(trimmedText),
+    };
+
+    // Get word statistics
+    const words = trimmedText.split(/\s+/);
+    const uniqueWords = new Set(words.map((w) => w.toLowerCase()));
+    const uniqueRatio = uniqueWords.size / words.length;
+
+    // Check for gibberish patterns
+    if (
+      gibberishPatterns.repeatingLetters.test(trimmedText) ||
+      gibberishPatterns.repeatingWords.test(trimmedText) ||
+      (gibberishPatterns.alphabetStrings && uniqueRatio < 0.4) ||
+      (words.length > 5 && uniqueRatio < 0.2) // If long text has very few unique words
+    ) {
+      toast({
+        title: "Invalid Input",
+        description: "Please enter a meaningful text",
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    // // Check for excessive special characters
+    // const specialCharCount = (trimmedText.match(/[^a-zA-Z0-9\s.,!?'-]/g) || [])
+    //   .length;
+    // const specialCharRatio = specialCharCount / trimmedText.length;
+
+    // if (specialCharRatio > 0.3) {
     //   toast({
     //     title: "Invalid Input",
-    //     description: "Please enter meaningful text",
+    //     description: "Too many special characters",
     //     variant: "destructive",
     //   });
     //   return false;
     // }
+    // failed test for other languages
 
     return true;
   }, []);
 
-  const handleDetectLanguage = useCallback(async () => {
-    if (
-      !state.input.trim() ||
-      state.loading ||
-      state.detectingLanguage.current
-    ) {
-      return;
-    }
+  const handleDetectLanguage = useCallback(
+    async (messageId: string) => {
+      if (state.loadedContent[messageId]?.languageDetected) return;
 
-    try {
-      state.detectingLanguage.current = true;
-      state.setLoading(true);
+      if (
+        !state.input.trim() ||
+        state.loading ||
+        state.detectingLanguage.current
+      ) {
+        return;
+      }
 
-      await executeWithRetry({
-        action: async () => {
-          const response = await apiService.detectLanguage(state.input);
-          if (response.success) {
-            state.setDetectedLanguage(response.data.detectedLanguage);
-            // Optionally handle confidence
-            if (response.data.confidence < 0.7) {
-              toast({
-                title: "Low Confidence Detection",
-                description: "Language detection may not be accurate",
-                variant: "destructive",
-                duration: 3000,
-              });
+      try {
+        state.detectingLanguage.current = true;
+        state.setLoading(true);
+
+        await executeWithRetry({
+          action: async () => {
+            const response = await apiService.detectLanguage(state.input);
+            if (response.success) {
+              state.setDetectedLanguage(response.data.detectedLanguage);
+              // Optionally handle confidence
+              if (response.data.confidence < 0.7) {
+                toast({
+                  title: "Low Confidence Detection",
+                  description: "Language detection may not be accurate",
+                  variant: "destructive",
+                  duration: 3000,
+                });
+              }
+              state.setLoadedContent(messageId, "languageDetected", true);
+            } else {
+              throw new Error(response.error);
             }
-          } else {
-            throw new Error(response.error);
-          }
-        },
-        errorTitle: "Language detection failed",
-      });
-    } finally {
-      state.detectingLanguage.current = false;
-      state.setLoading(false);
-    }
-  }, [state.input, state.loading, executeWithRetry]);
+          },
+          errorTitle: "Language detection failed",
+        });
+      } finally {
+        state.detectingLanguage.current = false;
+        state.setLoading(false);
+      }
+    },
+    [state.input, state.loading, executeWithRetry]
+  );
 
   const handleSend = useCallback(async () => {
     if (!checkBrowserSupport()) return;
     if (!validateText(state.input)) return;
 
-    try {
-      state.setLoading(true);
-      const messageId = `msg_${Date.now()}`;
-      const newChat = {
-        id: messageId,
-        sessionId: state.currentSessionId,
-        message: state.input,
-        date: new Date().toISOString(),
-        user: state.userName,
-        relatedContent: {},
-      };
+    const messageId = `msg_${Date.now()}`;
+    const newChat: ChatMessage = {
+      id: messageId,
+      sessionId: state.currentSessionId,
+      message: state.input,
+      date: new Date().toISOString(),
+      //   user: state.userName,
+      detectedLanguage: "",
+      relatedContent: {},
+    };
 
-      playMessageSound();
+    playMessageSound();
+    try {
+      // Add to current session
       state.setChats((prev) => [...prev, newChat]);
 
-      // Update localStorage with session grouping
+      // Update localStorage
       const savedChats = JSON.parse(localStorage.getItem("pastChats") || "[]");
       const userIndex = savedChats.findIndex(
         (chat: any) => chat.user === state.userName
@@ -155,34 +200,63 @@ export const useChatActions = (
 
       localStorage.setItem("pastChats", JSON.stringify(savedChats));
       window.dispatchEvent(new Event("chatUpdated"));
-      await handleDetectLanguage();
+
+      // Detect language after sending
+      const langResponse = await apiService.detectLanguage(state.input);
+      if (langResponse.success) {
+        const detectedLang = langResponse.data.detectedLanguage;
+        newChat.detectedLanguage = detectedLang;
+        state.setChats((prev) =>
+          prev.map((chat) =>
+            chat.id === messageId
+              ? { ...chat, detectedLanguage: detectedLang }
+              : chat
+          )
+        );
+      }
     } catch (error) {
       console.error("Send failed:", error);
     } finally {
       state.setInput("");
-      state.setLoading(false);
     }
-  }, [
-    state.input,
-    state.userName,
-    state.currentSessionId,
-    handleDetectLanguage,
-  ]);
+  }, [state.input, state.currentSessionId, state.userName]);
 
   const handleSummarize = useCallback(
     async (options: SummarizeOptions) => {
-      if (!checkBrowserSupport()) return;
-
       const lastChat = state.chats[state.chats.length - 1];
-      if (!lastChat?.message || lastChat.message.length < 150) {
+
+      // Early return conditions
+      if (!lastChat?.message) {
         toast({
-          title: "Invalid Input",
-          description: "Text must be at least 150 characters long",
+          title: "No Text to Summarize",
+          description: "Please enter some text first",
           variant: "destructive",
         });
         return;
       }
 
+      if (state.loadedContent[lastChat.id]?.summary) {
+        toast({
+          title: "Already Summarized",
+          description: "This text has already been summarized",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (!checkBrowserSupport()) return;
+
+      if (lastChat.message.length < 150) {
+        toast({
+          title: "Text Too Short",
+          description:
+            "Text must be at least 150 characters long for summarization",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      playMessageSound();
       try {
         state.setIsModalOpen(false);
         state.setLoading(true);
@@ -195,8 +269,9 @@ export const useChatActions = (
               lastChat.message,
               options
             );
+
             if (response.success) {
-              // Update the related content of the original message
+              // Update chat state with summary
               state.setChats((prev) =>
                 prev.map((chat) =>
                   chat.id === lastChat.id
@@ -210,7 +285,51 @@ export const useChatActions = (
                     : chat
                 )
               );
+
+              // Update localStorage
+              const savedChats = JSON.parse(
+                localStorage.getItem("pastChats") || "[]"
+              );
+              const userIndex = savedChats.findIndex(
+                (chat: any) => chat.user === state.userName
+              );
+
+              if (userIndex >= 0) {
+                const sessionIndex = savedChats[userIndex].sessions?.findIndex(
+                  (s: any) => s.sessionId === state.currentSessionId
+                );
+
+                if (sessionIndex >= 0) {
+                  const chatIndex = savedChats[userIndex].sessions[
+                    sessionIndex
+                  ].chats.findIndex((c: any) => c.id === lastChat.id);
+
+                  if (chatIndex >= 0) {
+                    savedChats[userIndex].sessions[sessionIndex].chats[
+                      chatIndex
+                    ] = {
+                      ...lastChat,
+                      relatedContent: {
+                        ...lastChat.relatedContent,
+                        summary: response.data.summary,
+                      },
+                    };
+                    localStorage.setItem(
+                      "pastChats",
+                      JSON.stringify(savedChats)
+                    );
+                  }
+                }
+              }
+
               state.setSummaryText(response.data.summary);
+              state.setLoadedContent(lastChat.id, "summary", true);
+
+              toast({
+                title: "Summary Created",
+                description: "Text has been successfully summarized",
+                variant: "default",
+              });
             } else {
               throw new Error(response.error || "Summarization failed");
             }
@@ -219,7 +338,7 @@ export const useChatActions = (
         });
       } catch (error) {
         toast({
-          title: "Operation Failed",
+          title: "Summarization Failed",
           description:
             error instanceof Error ? error.message : "An error occurred",
           variant: "destructive",
@@ -236,16 +355,48 @@ export const useChatActions = (
     if (!checkBrowserSupport()) return;
 
     const lastChat = state.chats[state.chats.length - 1];
+
+    // Check if there's text to translate
     if (!lastChat?.message) {
       toast({
-        title: "No text to translate",
-        description: "Please send a message first",
+        title: "No Text to Translate",
+        description: "Please add some text to translate first",
         variant: "destructive",
+        duration: 4000,
       });
       return;
     }
 
+    // Check if a target language is selected
+    if (!state.selectedLanguage) {
+      toast({
+        title: "No Language Selected",
+        description: "Please select a target language",
+        variant: "destructive",
+        duration: 4000,
+      });
+      return;
+    }
+
+    playMessageSound();
     try {
+      // First detect source language
+      const detectResponse = await apiService.detectLanguage(lastChat.message);
+      if (!detectResponse.success) {
+        throw new Error("Could not detect source language");
+      }
+
+      // Check if trying to translate to same language
+      if (detectResponse.data.detectedLanguage === state.selectedLanguage) {
+        toast({
+          title: "Same Language",
+          description: "Text is already in the selected language",
+          variant: "destructive",
+          duration: 4000,
+        });
+        return;
+      }
+
       state.setLoading(true);
       state.setProcessingTranslation(true);
       state.setTranslatedText(null);
@@ -256,8 +407,13 @@ export const useChatActions = (
             lastChat.message,
             state.selectedLanguage
           );
+
+          if (!response.success) {
+            throw new Error(response.error);
+          }
+
           if (response.success) {
-            // Update the related content of the original message
+            // Update chat state with translation
             state.setChats((prev) =>
               prev.map((chat) =>
                 chat.id === lastChat.id
@@ -271,23 +427,67 @@ export const useChatActions = (
                   : chat
               )
             );
+
+            // Update localStorage
+            const savedChats = JSON.parse(
+              localStorage.getItem("pastChats") || "[]"
+            );
+            const userIndex = savedChats.findIndex(
+              (chat: any) => chat.user === state.userName
+            );
+
+            if (userIndex >= 0 && savedChats[userIndex].sessions) {
+              const sessionIndex = savedChats[userIndex].sessions.findIndex(
+                (s: any) => s.sessionId === state.currentSessionId
+              );
+
+              if (sessionIndex >= 0) {
+                const chatIndex = savedChats[userIndex].sessions[
+                  sessionIndex
+                ].chats.findIndex((c: any) => c.id === lastChat.id);
+
+                if (chatIndex >= 0) {
+                  savedChats[userIndex].sessions[sessionIndex].chats[
+                    chatIndex
+                  ] = {
+                    ...lastChat,
+                    relatedContent: {
+                      ...lastChat.relatedContent,
+                      translation: response.data.translated_text,
+                    },
+                  };
+                  localStorage.setItem("pastChats", JSON.stringify(savedChats));
+                  window.dispatchEvent(new Event("chatUpdated"));
+                }
+              }
+            }
+
             state.setTranslatedText(response.data.translated_text);
-          } else {
-            throw new Error(response.error);
-          }
+            state.setLoadedContent(lastChat.id, "translation", true);
+
+            toast({
+              title: "Translation Complete",
+              description: "Text has been successfully translated",
+              variant: "default",
+            });
+          } 
         },
         errorTitle: "Translation failed",
+      });
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "An error occurred";
+      toast({
+        title: "Translation Failed",
+        description: errorMessage,
+        variant: "destructive",
+        duration: 6000,
       });
     } finally {
       state.setLoading(false);
       state.setProcessingTranslation(false);
     }
-  }, [
-    state.chats,
-    state.selectedLanguage,
-    executeWithRetry,
-    checkBrowserSupport,
-  ]);
+  }, [state, executeWithRetry, checkBrowserSupport]);
 
   const handleLogout = useCallback(() => {
     try {

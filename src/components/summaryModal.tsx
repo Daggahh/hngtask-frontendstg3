@@ -53,7 +53,7 @@ const SummaryModal: React.FC<SummaryModalProps> = ({
     onSummarize(options);
     onClose();
 
-    // Add loading state
+    // Added loading state
     state.setLoading(true);
     state.setSummaryText(null);
   };

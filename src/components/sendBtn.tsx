@@ -8,15 +8,17 @@ interface SendBtnProps {
 
 const SendBtn: React.FC<SendBtnProps> = ({ onClick }) => {
   return (
-    <StyledWrapper className="flex items-center">
-      <button
-        className="button"
-        onClick={onClick}
-        aria-label="process text"
-        role="button"
-      >
-        <Send />
-      </button>
+    <StyledWrapper>
+      <div className="flex items-center z-50 relative">
+        <button
+          className="button"
+          onClick={onClick}
+          aria-label="process text"
+          role="button"
+        >
+          <Send />
+        </button>
+      </div>
     </StyledWrapper>
   );
 };
@@ -28,8 +30,6 @@ const StyledWrapper = styled.div`
     --text-light: rgba(255, 255, 255, 0.4);
     --back-color: 118, 6%;
 
-    z-index: 10;
-    position: relative;
     cursor: pointer;
     padding: 0.7em 1em;
     border-radius: 50%;
