@@ -51,7 +51,7 @@ interface StoredUserData {
   sessions: ChatSession[];
 }
 
-// Add this interface for grouped sessions
+//  this interface is for grouped sessions
 interface GroupedSession {
   sessionId: string;
   lastMessage: ChatMessage;
@@ -269,13 +269,13 @@ export function AppSidebar({
                               <div className="flex items-center gap-2">
                                 {session.lastMessage.relatedContent
                                   ?.summary && (
-                                  <span className="text-xs text-green-500">
+                                  <span className="text-xs text-green-500 text-center">
                                     Summary available
                                   </span>
                                 )}
                                 {session.lastMessage.relatedContent
                                   ?.translation && (
-                                  <span className="text-xs text-green-500">
+                                  <span className="text-xs text-green-500 text-center">
                                     Translation available
                                   </span>
                                 )}
